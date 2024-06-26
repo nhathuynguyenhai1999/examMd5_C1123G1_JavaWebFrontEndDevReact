@@ -1,64 +1,85 @@
-import logo from './logo.svg';
 import React, { useState, useEffect } from 'react';
-import './App.css';
 import OrderForm from "./components/orderForm";
 import OrderTable from "./components/orderTable";
-import axios from 'axios';
-import AddOrder from "./components/addOrder";
-import SearchOrders from "./components/SearchOrders";
-import TopOrders from "./components/TopOrders";
+import SearchForm from "./components/searchForm";
+import './App.css';
+
 function App() {
     const [orders, setOrders] = useState([]);
-    const [searchResults, setSearchResults] = useState([]);
-    const addOrder = (newOrder) => {
-        setOrders([...orders, newOrder]);
-    };
-    const fetchOrders = () => {
-    axios.get('http://localhost:3000/orders')
-      .then(response => setOrders(response.data))
-      .catch(error => console.error('Error fetching orders:', error));
-    };
+    const [products, setProducts] = useState([]);
+    const [filteredOrders, setFilteredOrders] = useState([]);
+    const [searchCriteria, setSearchCriteria] = useState({ startDate: '', endDate: '', productId: '' });
+    const [noResults, setNoResults] = useState(false);
+    const [topOrders, setTopOrders] = useState([]);
+    const [topN, setTopN] = useState(0);
+
     useEffect(() => {
-    fetchOrders();
+        fetch('http://localhost:5000/products')
+            .then(response => response.json())
+            .then(data => setProducts(data));
+
+        fetch('http://localhost:5000/orders')
+            .then(response => response.json())
+            .then(data => {
+                setOrders(data);
+                setFilteredOrders(data);
+            });
     }, []);
+
+    const addOrder = (newOrder) => {
+        fetch('http://localhost:5000/orders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(newOrder)
+        })
+        .then(response => response.json())
+        .then(order => {
+            setOrders([...orders, order]);
+            setFilteredOrders([...orders, order]);
+            alert('Order added successfully!');
+        });
+    };
+
+    const searchOrders = (criteria) => {
+        let filtered = orders;
+        if (criteria.startDate) {
+            filtered = filtered.filter(order => new Date(order.purchaseDate) >= new Date(criteria.startDate));
+        }
+        if (criteria.endDate) {
+            filtered = filtered.filter(order => new Date(order.purchaseDate) <= new Date(criteria.endDate));
+        }
+        if (criteria.productId) {
+            filtered = filtered.filter(order => order.products.some(product => product.productId === criteria.productId));
+        }
+        setFilteredOrders(filtered);
+        setNoResults(filtered.length === 0);
+    };
+
+    const handleTopNChange = (e) => {
+        setTopN(e.target.value);
+    };
+
+    const viewTopOrders = () => {
+        const sortedOrders = orders.slice().sort((a, b) => b.totalAmount - a.totalAmount);
+        const topOrders = sortedOrders.slice(0, topN);
+        setTopOrders(topOrders);
+        setFilteredOrders([]);
+        setNoResults(topOrders.length === 0);
+    };
+
     return (
         <div className="App">
             <h1>Order Management System</h1>
-            <OrderForm addOrder={addOrder} />
-            <OrderTable orders={orders} />
-            <h1>Order List</h1>
-            <AddOrder onOrderAdded={fetchOrders} />
-            <ul>
-            {orders.map(order => (
-            <li key={order.id}>
-            Order #{order.id} - Product ID: {order.productId} - Quantity: {order.quantity} - Purchase Date: {order.purchaseDate}
-            </li>
-        ))}
-      </ul>
-      <h1>Order System</h1>
-      <AddOrder onOrderAdded={fetchOrders} />
-      <SearchOrders onSearchResults={setSearchResults} />
-      <TopOrders />
-      <h2>Search Results</h2>
-      {searchResults.length === 0 ? (
-        <p>No results found</p>
-      ) : (
-        <ul>
-          {searchResults.map(order => (
-            <li key={order.id}>
-              Order #{order.id} - Product ID: {order.productId} - Quantity: {order.quantity} - Purchase Date: {order.purchaseDate}
-            </li>
-          ))}
-        </ul>
-      )}
-      <h2>All Orders</h2>
-      <ul>
-        {orders.map(order => (
-          <li key={order.id}>
-            Order #{order.id} - Product ID: {order.productId} - Quantity: {order.quantity} - Purchase Date: {order.purchaseDate}
-          </li>
-        ))}
-      </ul>
+            <OrderForm addOrder={addOrder} products={products} />
+            <SearchForm searchOrders={searchOrders} products={products} setSearchCriteria={setSearchCriteria} />
+            <div>
+                <label>Số lượng top đơn hàng: </label>
+                <input type="number" value={topN} onChange={handleTopNChange} />
+                <button onClick={viewTopOrders}>Xem top</button>
+            </div>
+            {noResults ? <p>Không có kết quả</p> : <OrderTable orders={topOrders.length > 0 ? topOrders : filteredOrders} />}
         </div>
     );
 }

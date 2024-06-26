@@ -30,7 +30,7 @@ function OrderTable({ orders }) {
                             <td>{index + 1}</td>
                             <td>{order.orderId}</td>
                             <td>{product.name}</td>
-                            <td>{formatDate(order.purchaseDate)}</td>
+                            <td>{formatDate(new Date(order.purchaseDate))}</td>
                             <td>{product.price}</td>
                             <td>{order.quantity}</td>
                             <td>{order.totalAmount}</td>
